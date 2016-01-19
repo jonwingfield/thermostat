@@ -3,6 +3,7 @@ use std::thread;
 use std::time::Duration;
 
 extern crate thermostat;
+extern crate env_logger;
 
 use thermostat::uom::temp::*;
 use thermostat::controller::*;
@@ -24,6 +25,9 @@ impl TempSensor for Sensor {
 }
 
 fn main() {
+    // initialize logging framework
+    env_logger::init().unwrap();
+
     let hold_temp = Temperature::in_c(env::args().nth(1).expect(USAGE)
                                .parse::<f32>().expect("Invalid hold temperature"));
 
@@ -32,14 +36,12 @@ fn main() {
 
     let min_temp = hold_temp.to_f() - Temperature::in_f(5.0);
 
-    println!("Temp: {}", hold_temp.to_f());
-
-    let controller = Controller::new(hold_temp.to_f(), min_temp);
-    let sensor = Sensor;
     let mut compressor = Compressor::new();
+    let mut controller = Controller::new(&mut compressor, hold_temp.to_f(), min_temp);
+    let sensor = Sensor;
 
     loop {
-        controller.control(&sensor, &mut compressor);
+        controller.temp_changed(sensor.get_temperature());
 
         thread::sleep(Duration::from_secs(sleep_duration_s));
     }

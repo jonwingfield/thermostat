@@ -2,3 +2,8 @@
 name = "thermostat"
 version = "0.1.0"
 authors = ["Jon Wingfield <wingfield.jon@gmail.com>"]
+
+[dependencies]
+log = "*"
+env_logger = "*"
+chrono = "0.2"
