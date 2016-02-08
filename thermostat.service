@@ -1,0 +1,13 @@
+[Unit]
+Description=Thermostat Monitor and Basic Config Webserver
+After=mdns.service
+
+[Service]
+ExecStart=/bin/su root -c 'cd /home/root; ./thermostat 79 74 30'
+Restart=always
+RestartSec=10s
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=default.target
+
