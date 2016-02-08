@@ -8,7 +8,8 @@ use chrono::*;
 
 pub struct Controller<'a> {
     config: Config,
-    compressor: &'a mut Compressor,
+    compressor: &'a mut Compressor<'a>,
+    temp: Temperature<F>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -21,22 +22,31 @@ pub enum Status {
 
 
 impl<'a> Controller<'a> {
-    pub fn new(compressor: &'a mut Compressor, config: Config) -> Controller { 
+    pub fn new(compressor: &'a mut Compressor<'a>, config: Config, temp: Temperature<F>) -> Controller { 
         Controller { 
             config: config,
-            compressor: compressor
+            compressor: compressor,
+            temp:  temp,
         } 
     }
 
     pub fn update_config(&mut self, config: Config) {
         self.config = config;
+        let temp = self.temp;
+        self.temp_changed(temp);
     }
 
     pub fn temp_changed(&mut self, temp: Temperature<F>) {
+        self.temp = temp;
+    }
+
+    pub fn time_changed(&mut self, time: DateTime<UTC>) {
         use ::controller::Status::*;
         use ::ac_control::compressor::CompressorMode::*;
 
-        let status = self.check_status(temp);
+        self.compressor.set_fan_mode(self.config.is_fan_on(time));
+
+        let status = self.check_status(time, self.temp);
         match status {
             TooHot => self.compressor.set_mode(Cool),
             TooCold => self.compressor.set_mode(HeatPump),
@@ -46,14 +56,10 @@ impl<'a> Controller<'a> {
         info!("Status: {:?}", status);
     }
 
-    pub fn time_changed(&mut self, time: DateTime<UTC>) {
-        self.compressor.set_fan_mode(self.config.is_fan_on(time));
-    }
-
-    pub fn check_status(&self, temp: Temperature<F>) -> Status {
+    pub fn check_status(&self, time: DateTime<UTC>, temp: Temperature<F>) -> Status {
         use ::controller::Status::*;
         
-        let (min_range, max_range) = self.config.get_temp_ranges();
+        let (min_range, max_range) = self.config.get_temp_ranges(time);
 
         if temp > max_range.end {
             TooHot

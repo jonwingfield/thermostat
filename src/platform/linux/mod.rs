@@ -1,5 +1,6 @@
 use ::uom::temp::*;
 use ::sensors::TempReader;
+use ::ac_control::compressor::Switches;
 use std::fs::OpenOptions;
 use std::fs::File;
 use std::io::BufReader;
@@ -42,6 +43,52 @@ impl TempReader for McuTemp {
     fn get_temp() -> Temperature<F> {
         // TODO: eliminate these unwraps
         parse_temp(read_sensor(open_sensor())).unwrap()
+    }
+}
+
+pub mod ac_control {
+    use mraa_api::gpio::Gpio;
+    use mraa_api::gpio::MRAA_INTEL_EDISON;
+    use mraa_api::gpio::GPIO_DIR;
+    use ::ac_control::compressor::Switches;
+
+    pub struct GpioSwitches {
+        cool_gpio: Gpio,
+        heat_gpio: Gpio,
+        fan_gpio: Gpio,
+    }
+
+    impl GpioSwitches {
+        pub fn new() -> GpioSwitches {
+            let mut switches = GpioSwitches {
+                cool_gpio: Gpio::new(14),
+                heat_gpio: Gpio::new(15),
+                fan_gpio: Gpio::new(31),
+            };
+
+            switches.cool_gpio.set_dir(GPIO_DIR::MRAA_GPIO_OUT);
+            switches.heat_gpio.set_dir(GPIO_DIR::MRAA_GPIO_OUT);
+            switches.fan_gpio.set_dir(GPIO_DIR::MRAA_GPIO_OUT);
+
+            switches
+        }
+    }
+
+    impl Switches for GpioSwitches {
+        fn set_cool(&mut self, on: bool) {
+            self.cool_gpio.write(on);
+            info!("Writing to cool gpio: {}", on);
+        }
+
+        fn set_heat(&mut self, on: bool) {
+            self.heat_gpio.write(on);
+            info!("Writing to heat gpio: {}", on);
+        }
+
+        fn set_fan(&mut self, on: bool) {
+            self.fan_gpio.write(on);
+            info!("Writing to fan gpio: {}", on);
+        }
     }
 }
 

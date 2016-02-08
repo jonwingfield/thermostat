@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["Jon Wingfield <wingfield.jon@gmail.com>"]
 
 [dependencies]
+rustc-serialize = "0.3"
 log = "*"
+num = "*"
 env_logger = "*"
 chrono = "0.2"
+thermostat_server = { path = '../thermostat_server/' }
+mraa-api = { path = '../rust-mraa-api/' }
+

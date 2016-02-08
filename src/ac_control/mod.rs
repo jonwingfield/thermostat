@@ -8,16 +8,23 @@ pub mod compressor {
         Off,
     }
 
-    pub struct Compressor {
+    pub trait Switches {
+        fn set_cool(&mut self, on: bool);
+        fn set_heat(&mut self, on: bool);
+        fn set_fan(&mut self, on: bool);
+    }
+
+    pub struct Compressor<'a> {
         mode: CompressorMode,
         fan_mode: bool,
         min_duration: Duration,
         next_allowed_compressor_change: DateTime<UTC>,
         next_allowed_fan_change: DateTime<UTC>,
+        switches: &'a mut Switches,
     }
 
-    impl Compressor {
-        pub fn new() -> Compressor { 
+    impl<'a> Compressor<'a> {
+        pub fn new(switches: &mut Switches) -> Compressor { 
             let now = UTC::now();
             // TODO: possibly use lazy_static crate here
             let min_duration = Duration::minutes(2);
@@ -26,7 +33,8 @@ pub mod compressor {
                 fan_mode: false,
                 next_allowed_compressor_change: now - min_duration,
                 next_allowed_fan_change: now - min_duration,
-                min_duration: min_duration
+                min_duration: min_duration,
+                switches: switches,
             }
         }
 
@@ -42,6 +50,15 @@ pub mod compressor {
             if self.next_allowed_compressor_change < now {
                 self.mode = mode;
                 self.next_allowed_compressor_change = now + self.min_duration;
+                
+                let modes = match mode {
+                     CompressorMode::Cool => (true, false),
+                     CompressorMode::HeatPump => (false, true),
+                     CompressorMode::Off => (false, false)
+                };
+                     
+                self.switches.set_cool(modes.0);
+                self.switches.set_heat(modes.1);
             } else {
                 warn!("Compressor toggled too fast. {} {}", now, self.next_allowed_compressor_change);
             }
@@ -58,6 +75,8 @@ pub mod compressor {
             if self.next_allowed_fan_change < now {
                 self.fan_mode = mode;
                 self.next_allowed_fan_change = now + self.min_duration;
+                info!("Fan mode: {}", mode);
+                self.switches.set_fan(mode);
             } else {
                 warn!("Fan toggled too fast. {} {}", now, self.next_allowed_fan_change);
             }

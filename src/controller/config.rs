@@ -5,22 +5,45 @@ use chrono::*;
 use std::ops::Range;
 
 /// Intended to be copied into Controller, not moved or borrowed
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Config {
     pub max_temp: Temperature<F>,
     pub min_temp: Temperature<F>,
     hold_end: Option<DateTime<UTC>>,
     fan_end: Option<DateTime<UTC>>,
+    schedule: Schedule,
 }
 
 // TODO: not sure if this belongs here or in the Controller. It protects the compressor, so it may even
 // belong there
 const HOLD_RANGE: Range<f32> = Range { start: -0.5, end: 0.9 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct ScheduleLeg {
-    weekday: Weekday,
-    active_range: Range<NaiveTime>,
+    pub min_temp: Temperature<F>,
+    pub max_temp: Temperature<F>,
+    pub weekdays: Vec<Weekday>,
+    pub active_range: Range<NaiveTime>,
+}
+
+#[derive(Clone)]
+pub struct Schedule {
+    legs: Vec<ScheduleLeg>,
+}
+
+impl Schedule {
+    pub fn new(legs: Vec<ScheduleLeg>) -> Schedule {
+        Schedule { legs: legs }
+    }
+
+    pub fn get_active_leg(&self, current_datetime: DateTime<UTC>) -> Option<&ScheduleLeg> {
+        let weekday = current_datetime.weekday();
+        // shift the current time because the scheule legs use a NaiveTime
+        let time = current_datetime.with_timezone(&Local).time();
+        self.legs.iter().find(|leg| {
+            leg.weekdays.iter().find(|w| **w == weekday) != None && leg.active_range.start <= time && leg.active_range.end >= time 
+        })
+    }
 }
 
 impl Config {
@@ -29,7 +52,8 @@ impl Config {
             max_temp: max_temp,
             min_temp: min_temp,
             hold_end: None,
-            fan_end: None
+            fan_end: None,
+            schedule: Schedule::new(vec![]),
         }
     }
 
@@ -56,22 +80,26 @@ impl Config {
         }
     }
 
-    pub fn is_hold_mode(&self, time: DateTime<UTC>) -> bool {
-        match self.hold_end {
-            Some(hold_end) => time < hold_end,
-            None => false 
-        }
-    }
-
     /// Returns a tuple of (minRange, maxRange) specifying the allowable ranges of temperatures
     /// before turning on AC, Heat, ETC
-    pub fn get_temp_ranges(&self) -> (Range<T<F>>, Range<T<F>>) {
+    pub fn get_temp_ranges(&self, time: DateTime<UTC>) -> (Range<T<F>>, Range<T<F>>) {
         let temp_range = T::in_f(HOLD_RANGE.start)..T::in_f(HOLD_RANGE.end);
+        let (min_temp, max_temp) = match self.schedule.get_active_leg(time) {
+            Some(active_leg) => {
+                info!("Schedule active!");
+                (active_leg.min_temp, active_leg.max_temp)
+            },
+            None => (self.min_temp, self.max_temp),
+        };
 
         (
-            (self.min_temp - temp_range.end)..(self.min_temp - temp_range.start),
-            (self.max_temp + temp_range.start)..(self.max_temp + temp_range.end)
+            (min_temp - temp_range.end)..(min_temp - temp_range.start),
+            (max_temp + temp_range.start)..(max_temp + temp_range.end)
         )
+    }
+
+    pub fn set_schedule(&mut self, schedule: Schedule) {
+        self.schedule = schedule;
     }
 }
 

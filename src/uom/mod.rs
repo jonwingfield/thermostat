@@ -68,6 +68,10 @@ pub mod temp {
         pub fn to_f(&self) -> Temperature<F> {
             Temperature::in_f(((self.0 as f32)/10.0 * (9.0/5.0) + 32.0))
         }
+
+        pub fn value(&self) -> f32 {
+            return self.0 as f32 / 10.0;
+        }
     }
 
     impl Temperature<F> {
@@ -77,6 +81,10 @@ pub mod temp {
 
         pub fn to_c(&self) -> Temperature<C> {
             Temperature::in_c((self.0 as f32 / 10.0 - 32.0) * (5.0/9.0))
+        }
+
+        pub fn value(&self) -> f32 {
+            return self.0 as f32 / 10.0;
         }
     }
 }
